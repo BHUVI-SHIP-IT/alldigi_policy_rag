@@ -22,9 +22,6 @@ const EmployeeChat = () => {
       if (res.ok) {
         const data = await res.json();
         setConversations(data);
-        if (data.length > 0 && !activeConvId) {
-          setActiveConvId(data[0].id);
-        }
       }
     } catch (e) {
       console.error(e);
@@ -45,25 +42,9 @@ const EmployeeChat = () => {
     }
   };
 
-  const createConversation = async () => {
-    try {
-      const res = await fetch('/api/chat/conversations', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ title: 'New Conversation' })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setConversations([data, ...conversations]);
-        setActiveConvId(data.id);
-        setMessages([]);
-      }
-    } catch (e) {
-      console.error(e);
-    }
+  const startNewChat = () => {
+    setActiveConvId(null);
+    setMessages([]);
   };
 
   const deleteConversation = async (id, e) => {
@@ -103,10 +84,39 @@ const EmployeeChat = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!input.trim() || !activeConvId) return;
+    if (!input.trim()) return;
 
+    let convId = activeConvId;
     const userMessage = { role: 'user', content: input };
     const currentInput = input;
+    
+    // If no conversation is active, create one in the database first
+    if (!convId) {
+      try {
+        const title = currentInput.length > 40 ? currentInput.substring(0, 40) + '...' : currentInput;
+        const res = await fetch('/api/chat/conversations', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}` 
+          },
+          body: JSON.stringify({ title })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          convId = data.id;
+          setConversations(prev => [data, ...prev]);
+          setActiveConvId(convId);
+        } else {
+          console.error("Failed to create conversation");
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to create conversation:", err);
+        return;
+      }
+    }
+
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
@@ -122,7 +132,7 @@ const EmployeeChat = () => {
     }
 
     try {
-      const res = await fetch(`/api/chat/conversations/${activeConvId}/ask`, {
+      const res = await fetch(`/api/chat/conversations/${convId}/ask`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -210,7 +220,7 @@ const EmployeeChat = () => {
         <div className="sidebar-header">
           <img src={logo} alt="AllDigi Logo" className="sidebar-logo" />
         </div>
-        <button onClick={createConversation} className="new-chat-btn">
+        <button onClick={startNewChat} className="new-chat-btn">
           <Plus size={18} /> New Chat
         </button>
         

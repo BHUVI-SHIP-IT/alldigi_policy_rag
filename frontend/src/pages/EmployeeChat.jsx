@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import useAuthStore from '../store/useAuthStore';
 import ReactMarkdown from 'react-markdown';
 import { Plus, MessageSquare, LogOut, Send, Bot, User, Trash2 } from 'lucide-react';
+import logo from '../assets/logo.png';
 import './EmployeeChat.css';
 
 const EmployeeChat = () => {
@@ -206,6 +207,9 @@ const EmployeeChat = () => {
     <div className="chat-layout">
       {/* Sidebar */}
       <div className="chat-sidebar">
+        <div className="sidebar-header">
+          <img src={logo} alt="AllDigi Logo" className="sidebar-logo" />
+        </div>
         <button onClick={createConversation} className="new-chat-btn">
           <Plus size={18} /> New Chat
         </button>

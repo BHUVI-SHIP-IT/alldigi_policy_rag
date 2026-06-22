@@ -15,6 +15,20 @@
   padding: 1rem;
 }
 
+.sidebar-header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-logo {
+  max-width: 140px;
+  max-height: 50px;
+  object-fit: contain;
+}
+
 .new-chat-btn {
   display: flex;
   align-items: center;

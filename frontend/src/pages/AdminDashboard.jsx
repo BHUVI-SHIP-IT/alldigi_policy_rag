@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useAuthStore from '../store/useAuthStore';
 import { UploadCloud, Trash2, FileText, Database, Activity, LogOut } from 'lucide-react';
+import logo from '../assets/logo.png';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -89,6 +90,7 @@ const AdminDashboard = () => {
       {/* Sidebar */}
       <div className="admin-sidebar">
         <div className="sidebar-header">
+          <img src={logo} alt="AllDigi Logo" className="sidebar-logo" />
           <h2>Admin Portal</h2>
         </div>
         <nav className="sidebar-nav">

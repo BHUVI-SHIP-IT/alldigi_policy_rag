@@ -8,12 +8,27 @@
   --bg-primary: #ffffff;
   --bg-secondary: #f9f9f9;
   --bg-hover: #ececec;
+  --bg-card: #ffffff;
+  --bg-table-header: #fafafa;
   --text-primary: #0d0d0d;
   --text-secondary: #6e6e80;
   --border-color: #e5e5e5;
   --accent-color: #10a37f;
   --accent-hover: #1a7f64;
   --error-color: #ef4444;
+}
+
+body.dark-mode {
+  --bg-primary: #171717;
+  --bg-secondary: #212121;
+  --bg-hover: #2f2f2f;
+  --bg-card: #212121;
+  --bg-table-header: #2f2f2f;
+  --text-primary: #ececec;
+  --text-secondary: #b4b4b4;
+  --border-color: #3f3f3f;
+  --accent-color: #10a37f;
+  --accent-hover: #1a7f64;
 }
 
 * {

@@ -114,6 +114,22 @@
   border-top: 1px solid var(--border-color);
 }
 
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  margin-bottom: 0.25rem;
+}
+
+.theme-toggle-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 .logout-btn {
   display: flex;
   align-items: center;
@@ -230,7 +246,7 @@
   display: flex;
   box-shadow: 0 0 15px rgba(0,0,0,0.1);
   border-radius: 12px;
-  background: white;
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
 }
 
@@ -242,6 +258,7 @@
   background: transparent;
   outline: none;
   font-size: 1rem;
+  color: var(--text-primary);
 }
 
 .input-form button {

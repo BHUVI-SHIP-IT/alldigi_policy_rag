@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import useAuthStore from '../store/useAuthStore';
 import ReactMarkdown from 'react-markdown';
-import { Plus, MessageSquare, LogOut, Send, Bot, User, Trash2 } from 'lucide-react';
+import { Plus, MessageSquare, LogOut, Send, Bot, User, Trash2, Sun, Moon } from 'lucide-react';
+import useThemeStore from '../store/useThemeStore';
 import logo from '../assets/logo.png';
 import './EmployeeChat.css';
 
@@ -12,6 +13,7 @@ const EmployeeChat = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { token, logout } = useAuthStore();
+  const { isDarkMode, toggleTheme } = useThemeStore();
   const messagesEndRef = useRef(null);
 
   const fetchConversations = async () => {
@@ -245,6 +247,10 @@ const EmployeeChat = () => {
         </div>
 
         <div className="sidebar-footer">
+          <button onClick={toggleTheme} className="theme-toggle-btn">
+            {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+            {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+          </button>
           <button onClick={logout} className="logout-btn">
             <LogOut size={16} /> Logout
           </button>

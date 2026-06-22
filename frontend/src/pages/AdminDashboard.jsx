@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useAuthStore from '../store/useAuthStore';
-import { UploadCloud, Trash2, FileText, Database, Activity, LogOut } from 'lucide-react';
+import { UploadCloud, Trash2, FileText, Database, Activity, LogOut, Sun, Moon } from 'lucide-react';
 import logo from '../assets/logo.png';
+import useThemeStore from '../store/useThemeStore';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -9,6 +10,7 @@ const AdminDashboard = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
   const { token, logout } = useAuthStore();
+  const { isDarkMode, toggleTheme } = useThemeStore();
   const fileInputRef = useRef(null);
 
   const fetchDocuments = useCallback(async () => {
@@ -102,6 +104,10 @@ const AdminDashboard = () => {
           </button>
         </nav>
         <div className="sidebar-footer">
+          <button onClick={toggleTheme} className="nav-item">
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+          </button>
           <button onClick={logout} className="nav-item text-error">
             <LogOut size={18} /> Logout
           </button>

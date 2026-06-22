@@ -6,7 +6,7 @@
 
 .admin-sidebar {
   width: 260px;
-  background-color: white;
+  background-color: var(--bg-card);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -109,7 +109,7 @@
 }
 
 .stat-card {
-  background: white;
+  background: var(--bg-card);
   padding: 1.5rem;
   border-radius: 8px;
   border: 1px solid var(--border-color);
@@ -131,7 +131,7 @@
 }
 
 .content-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: 8px;
   border: 1px solid var(--border-color);
   overflow: hidden;
@@ -175,7 +175,7 @@
 }
 
 .documents-table th {
-  background-color: #fafafa;
+  background-color: var(--bg-table-header);
   color: var(--text-secondary);
   font-weight: 500;
   font-size: 0.875rem;

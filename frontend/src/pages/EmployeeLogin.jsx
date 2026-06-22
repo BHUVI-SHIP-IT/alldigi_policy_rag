@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/useAuthStore';
+import logo from '../assets/logo.png';
 import './Login.css';
 
 const EmployeeLogin = () => {
@@ -38,6 +39,9 @@ const EmployeeLogin = () => {
   return (
     <div className="login-container">
       <div className="login-box">
+        <div className="login-logo-container">
+          <img src={logo} alt="AllDigi Logo" className="login-logo" />
+        </div>
         <h2>Welcome Back</h2>
         <p className="login-subtitle">Sign in to talk to your AI assistant.</p>
         <form onSubmit={handleLogin} className="login-form">

@@ -25,3 +25,8 @@ frontend/dist/
 # Qdrant / Database volumes (if any local folders exist)
 qdrant_storage/
 postgres_data/
+
+# Uploads and temporary test files
+backend/uploads/
+*test*.js
+test_chat.js

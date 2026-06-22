@@ -26,7 +26,7 @@ const initLLM = async () => {
       llmModel = await llama.loadModel({ modelPath: LLM_MODEL_PATH });
       llmContext = await llmModel.createContext();
       console.log('LLaMA model loaded successfully.');
-    } catch(e) {
+    } catch (e) {
       console.error('Failed to load node-llama-cpp dynamically', e);
     }
   } else {
@@ -57,7 +57,7 @@ const extractFromUrl = async (url) => {
   return $('body').text().replace(/\s+/g, ' ').trim();
 };
 
-const chunkText = (text, chunkSize = 800, overlap = 150) => {
+const chunkText = (text, chunkSize = 200, overlap = 50) => {
   const words = text.split(/\s+/);
   const chunks = [];
   let currentChunk = [];
@@ -105,32 +105,33 @@ const processDocument = async (filePath, mimetype, documentId) => {
     const text = await extractText(filePath, mimetype);
     // Semantic Overlapping Chunking
     const chunks = chunkText(text);
-    
-    // Create points for Qdrant
-    const points = await Promise.all(chunks.map(async (chunk, index) => {
+
+    // Pre-load the embedding model before processing chunks
+    // (avoids all chunks racing to load it simultaneously)
+    await generateEmbedding('warmup');
+
+    // Process chunks sequentially to keep the event loop free for other requests
+    const points = [];
+    for (let index = 0; index < chunks.length; index++) {
+      const chunk = chunks[index];
       const vector = await generateEmbedding(chunk);
-      return {
-        id: `${documentId}-${index}`, // Using string IDs or UUIDs
-        vector,
-        payload: {
-          documentId,
-          text: chunk,
-          chunkIndex: index
-        }
-      };
-    }));
+      points.push({
+        id: documentId * 1000 + index,
+        vector: { "text-dense": vector },
+        payload: { documentId, text: chunk, chunkIndex: index }
+      });
+      if ((index + 1) % 50 === 0) {
+        console.log(`  Embedded ${index + 1}/${chunks.length} chunks for document ${documentId}`);
+      }
+    }
 
-    // Generate numeric IDs or UUIDs for Qdrant
-    const qdrantPoints = points.map((p, i) => ({
-      id: documentId * 1000 + i, // simple numeric ID generation for this example
-      vector: p.vector,
-      payload: p.payload
-    }));
-
-    await qdrantClient.upsert(COLLECTION_NAME, {
-      wait: true,
-      points: qdrantPoints
-    });
+    // Batch upsert to stay under Qdrant's 32MB payload limit
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < points.length; i += BATCH_SIZE) {
+      const batch = points.slice(i, i + BATCH_SIZE);
+      await qdrantClient.upsert(COLLECTION_NAME, { wait: true, points: batch });
+      console.log(`  Indexed batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(points.length / BATCH_SIZE)} for document ${documentId}`);
+    }
 
     console.log(`Successfully processed and indexed document ${documentId}`);
     return true;
@@ -162,12 +163,13 @@ const deleteDocumentChunks = async (documentId) => {
 };
 
 // Querying
-const queryPolicy = async (question) => {
-  const queryVector = await generateEmbedding(question);
-  
+const queryPolicy = async (question, searchQuery, history, onChunk) => {
+  // Use the combined searchQuery for embedding search to maintain context (e.g. resolving pronouns like "his projects")
+  const queryVector = await generateEmbedding(searchQuery);
+
   const searchResult = await qdrantClient.search(COLLECTION_NAME, {
-    vector: queryVector,
-    limit: 10,
+    vector: { name: 'text-dense', vector: queryVector },
+    limit: 5, // Increased to 5 because chunks are now smaller (200 words)
   });
 
   const contextText = searchResult.map(r => r.payload.text).join('\n\n---\n\n');
@@ -181,16 +183,20 @@ const queryPolicy = async (question) => {
     try {
       const systemPrompt = `You are an internal corporate assistant.`;
 
-      const session = new LlamaChatSession({ 
+      const session = new LlamaChatSession({
         contextSequence: sequence,
         systemPrompt: systemPrompt
       });
       
+      const formattedHistory = history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
+      const historySection = history.length > 0 ? `\nConversation History:\n${formattedHistory}\n` : '';
+
       const userPrompt = `You must ONLY answer the following question based on the provided Context below. 
-You may correct obvious typos in the question to match the Context.
+You may use the Conversation History to understand pronouns or follow-up questions.
+Please provide a detailed, conversational answer in complete sentences.
 If the Context does not contain the answer, you must reply exactly with: "I cannot find the answer in the provided company policies."
 Do not make up answers. Do not use outside knowledge.
-
+${historySection}
 Context:
 ${contextText}
 
@@ -201,6 +207,7 @@ Question: ${question}`;
         maxTokens: 500,
         onTextChunk(chunk) {
           process.stdout.write(chunk);
+          if (onChunk) onChunk(chunk);
         }
       });
       console.log('\n----------------------------------\n');

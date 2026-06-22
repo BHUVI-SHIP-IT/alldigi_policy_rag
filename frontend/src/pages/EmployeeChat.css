@@ -52,6 +52,8 @@
   color: var(--text-secondary);
   text-align: left;
   transition: background-color 0.2s;
+  cursor: pointer;
+  position: relative;
 }
 
 .conv-item:hover {
@@ -65,9 +67,31 @@
 }
 
 .conv-title {
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.conv-delete-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 4px;
+}
+
+.conv-item:hover .conv-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.conv-delete-btn:hover {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.1);
 }
 
 .sidebar-footer {

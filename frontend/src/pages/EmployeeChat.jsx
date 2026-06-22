@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import useAuthStore from '../store/useAuthStore';
 import ReactMarkdown from 'react-markdown';
-import { Plus, MessageSquare, LogOut, Send, Bot, User } from 'lucide-react';
+import { Plus, MessageSquare, LogOut, Send, Bot, User, Trash2 } from 'lucide-react';
 import './EmployeeChat.css';
 
 const EmployeeChat = () => {
@@ -65,6 +65,27 @@ const EmployeeChat = () => {
     }
   };
 
+  const deleteConversation = async (id, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this chat?')) return;
+    
+    try {
+      const res = await fetch(`/api/chat/conversations/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setConversations(conversations.filter(c => c.id !== id));
+        if (activeConvId === id) {
+          setActiveConvId(null);
+          setMessages([]);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchConversations();
   }, []);
@@ -84,9 +105,20 @@ const EmployeeChat = () => {
     if (!input.trim() || !activeConvId) return;
 
     const userMessage = { role: 'user', content: input };
+    const currentInput = input;
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+
+    // Optimistically update conversation title if it's the first message
+    if (messages.length === 0) {
+      setConversations(prev => prev.map(conv => {
+        if (conv.id === activeConvId && conv.title === 'New Conversation') {
+          return { ...conv, title: currentInput.length > 40 ? currentInput.substring(0, 40) + '...' : currentInput };
+        }
+        return conv;
+      }));
+    }
 
     try {
       const res = await fetch(`/api/chat/conversations/${activeConvId}/ask`, {
@@ -98,14 +130,73 @@ const EmployeeChat = () => {
         body: JSON.stringify({ question: userMessage.content })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
-      } else {
+      if (!res.ok) {
         setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
+        return;
+      }
+
+      // Read SSE stream
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      
+      // Add empty assistant message placeholder
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+      setIsLoading(false); // Disable spinner since we are streaming text now
+      
+      let doneReading = false;
+      let assistantResponse = "";
+      let buffer = "";
+
+      while (!doneReading) {
+        const { value, done } = await reader.read();
+        if (done) {
+          doneReading = true;
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Process complete events separated by \n\n
+        let boundary;
+        while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+          const eventText = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          
+          if (eventText.startsWith('data: ')) {
+            const dataStr = eventText.slice(6);
+            if (!dataStr) continue;
+            
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.error) {
+                assistantResponse += `\n\n[Error: ${data.error}]`;
+                setMessages(prev => {
+                  const newMsgs = [...prev];
+                  newMsgs[newMsgs.length - 1].content = assistantResponse;
+                  return newMsgs;
+                });
+              } else if (data.chunk) {
+                if (data.clear) {
+                  assistantResponse = "";
+                }
+                assistantResponse += data.chunk;
+                setMessages(prev => {
+                  const newMsgs = [...prev];
+                  newMsgs[newMsgs.length - 1].content = assistantResponse;
+                  return newMsgs;
+                });
+              } else if (data.done) {
+                doneReading = true;
+              }
+            } catch (e) {
+              console.error("Failed to parse SSE data:", dataStr, e);
+            }
+          }
+        }
       }
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Connection failed.' }]);
+      console.error(error);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Connection failed. Please check your network and try again.' }]);
     } finally {
       setIsLoading(false);
     }
@@ -121,14 +212,21 @@ const EmployeeChat = () => {
         
         <div className="conversations-list">
           {conversations.map(conv => (
-            <button 
+            <div 
               key={conv.id} 
               className={`conv-item ${activeConvId === conv.id ? 'active' : ''}`}
               onClick={() => setActiveConvId(conv.id)}
             >
               <MessageSquare size={16} />
               <span className="conv-title">{conv.title}</span>
-            </button>
+              <button 
+                className="conv-delete-btn" 
+                onClick={(e) => deleteConversation(conv.id, e)}
+                title="Delete Chat"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           ))}
         </div>
 

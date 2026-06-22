@@ -44,7 +44,7 @@ router.get('/conversations/:id/messages', verifyToken, async (req, res) => {
   }
 });
 
-// Ask a question in a conversation
+// Ask a question in a conversation (Streaming SSE)
 router.post('/conversations/:id/ask', verifyToken, async (req, res) => {
   const { id } = req.params;
   const { question } = req.body;
@@ -53,15 +53,66 @@ router.post('/conversations/:id/ask', verifyToken, async (req, res) => {
     return res.status(400).json({ error: 'Question is required' });
   }
 
+  // Set up SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+  // Flush headers immediately so frontend knows connection is established
+  res.flushHeaders();
+
   try {
+    // Fetch history BEFORE inserting the new message
+    const historyResult = await db.query(
+      'SELECT role, content FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC LIMIT 10',
+      [id]
+    );
+    const history = historyResult.rows;
+
     // 1. Save user message
     await db.query(
       'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)',
       [id, 'user', question]
     );
 
-    // 2. Query RAG and LLM
-    const answer = await queryPolicy(question);
+    // Update conversation title if it's the first message
+    const msgCount = await db.query('SELECT count(*) FROM messages WHERE conversation_id = $1', [id]);
+    if (parseInt(msgCount.rows[0].count) === 1) {
+      const generatedTitle = question.length > 40 ? question.substring(0, 40) + '...' : question;
+      await db.query('UPDATE conversations SET title = $1 WHERE id = $2', [generatedTitle, id]);
+    }
+
+    // Send initial chunk so frontend shows something instantly and proxy doesn't drop
+    res.write(`data: ${JSON.stringify({ chunk: '⏳ *Thinking...*' })}\n\n`);
+
+    // Keep-alive ping every 15 seconds to prevent browser/proxy from closing idle connection
+    const keepAlive = setInterval(() => {
+      res.write(': keepalive\n\n');
+    }, 15000);
+
+    // Create a search query using the last user message + current question to give the vector search context
+    const previousUserMsg = history.filter(m => m.role === 'user').pop();
+    const searchQuery = previousUserMsg ? `${previousUserMsg.content}. ${question}` : question;
+
+    // 2. Query RAG and LLM with streaming callback
+    let firstActualChunk = true;
+    const answer = await queryPolicy(question, searchQuery, history, (chunk) => {
+      if (firstActualChunk) {
+        // Clear the "Thinking..." text by sending a clear flag
+        res.write(`data: ${JSON.stringify({ clear: true, chunk })}\n\n`);
+        firstActualChunk = false;
+      } else {
+        res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+      }
+    });
+
+    clearInterval(keepAlive);
+
+    // If no chunks were streamed (e.g., immediate return from RAG or mock), send the answer as a single chunk
+    if (firstActualChunk) {
+      res.write(`data: ${JSON.stringify({ clear: true, chunk: answer })}\n\n`);
+    }
 
     // 3. Save assistant message
     const assistantMsgResult = await db.query(
@@ -69,10 +120,14 @@ router.post('/conversations/:id/ask', verifyToken, async (req, res) => {
       [id, 'assistant', answer]
     );
 
-    res.json({ answer, messageId: assistantMsgResult.rows[0].id });
+    // 4. Send [DONE] event with the message ID
+    res.write(`data: ${JSON.stringify({ done: true, messageId: assistantMsgResult.rows[0].id })}\n\n`);
+    res.end();
   } catch (error) {
     console.error('Error in ask endpoint:', error);
-    res.status(500).json({ error: 'Failed to answer question' });
+    // If headers already sent, we can't change status, just send an error event
+    res.write(`data: ${JSON.stringify({ error: 'Failed to answer question' })}\n\n`);
+    res.end();
   }
 });
 

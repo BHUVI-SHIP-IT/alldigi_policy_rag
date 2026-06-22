@@ -17,11 +17,7 @@ const useAuthStore = create((set) => ({
   },
   
   checkAuth: () => {
-    const token = localStorage.getItem('token');
-    const role = localStorage.getItem('role');
-    if (token && role) {
-      set({ token, role });
-    }
+    // Auth is handled synchronously by reading from localStorage above
   }
 }));
 

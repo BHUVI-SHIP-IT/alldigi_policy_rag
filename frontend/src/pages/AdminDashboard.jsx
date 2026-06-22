@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useAuthStore from '../store/useAuthStore';
 import { UploadCloud, Trash2, FileText, Database, Activity, LogOut } from 'lucide-react';
 import './AdminDashboard.css';
@@ -10,7 +10,8 @@ const AdminDashboard = () => {
   const { token, logout } = useAuthStore();
   const fileInputRef = useRef(null);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
+    if (!token) return;
     try {
       const res = await fetch('/api/docs', {
         headers: { Authorization: `Bearer ${token}` }
@@ -18,18 +19,20 @@ const AdminDashboard = () => {
       if (res.ok) {
         const data = await res.json();
         setDocuments(data);
+      } else {
+        console.error('Failed to fetch documents:', res.status, await res.text());
       }
     } catch (e) {
-      console.error(e);
+      console.error('Network error fetching documents:', e);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchDocuments();
     // Poll for status updates every 5 seconds
     const interval = setInterval(fetchDocuments, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchDocuments]);
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];

@@ -18,8 +18,10 @@ const initializeQdrant = async () => {
     if (!collectionExists) {
       await qdrantClient.createCollection(COLLECTION_NAME, {
         vectors: {
-          size: VECTOR_SIZE,
-          distance: 'Cosine',
+          'text-dense': {
+            size: VECTOR_SIZE,
+            distance: 'Cosine',
+          },
         },
       });
       console.log(`Qdrant collection ${COLLECTION_NAME} created`);

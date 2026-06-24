@@ -12,6 +12,7 @@ const EmployeeChat = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const { token, logout } = useAuthStore();
   const { isDarkMode, toggleTheme } = useThemeStore();
   const messagesEndRef = useRef(null);
@@ -73,12 +74,6 @@ const EmployeeChat = () => {
   useEffect(() => {
     fetchConversations();
   }, []);
-
-  useEffect(() => {
-    if (activeConvId) {
-      fetchMessages(activeConvId);
-    }
-  }, [activeConvId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -155,6 +150,7 @@ const EmployeeChat = () => {
       // Add empty assistant message placeholder
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
       setIsLoading(false); // Disable spinner since we are streaming text now
+      setIsStreaming(true);
       
       let doneReading = false;
       let assistantResponse = "";
@@ -212,6 +208,7 @@ const EmployeeChat = () => {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Connection failed. Please check your network and try again.' }]);
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
     }
   };
 
@@ -231,7 +228,10 @@ const EmployeeChat = () => {
             <div 
               key={conv.id} 
               className={`conv-item ${activeConvId === conv.id ? 'active' : ''}`}
-              onClick={() => setActiveConvId(conv.id)}
+              onClick={() => {
+                setActiveConvId(conv.id);
+                fetchMessages(conv.id);
+              }}
             >
               <MessageSquare size={16} />
               <span className="conv-title">{conv.title}</span>
@@ -297,9 +297,9 @@ const EmployeeChat = () => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Message Policy Assistant..."
-              disabled={isLoading || !activeConvId}
+              disabled={isLoading || isStreaming}
             />
-            <button type="submit" disabled={!input.trim() || isLoading || !activeConvId}>
+            <button type="submit" disabled={!input.trim() || isLoading || isStreaming}>
               <Send size={18} />
             </button>
           </form>

@@ -35,7 +35,7 @@ const uploadFile = async (objectName, filePath) => {
   } catch (error) {
     console.error('Error uploading to MinIO:', error);
     throw error;
-  }
+  } c
 };
 
 const deleteFile = async (objectName) => {

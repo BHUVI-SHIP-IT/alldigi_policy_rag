@@ -3,7 +3,10 @@
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background-color: var(--bg-secondary);
+  background-image: url('/background.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .login-box {
@@ -41,7 +44,7 @@
   font-size: 0.875rem;
 }
 
-f .login-form {
+.login-form {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;

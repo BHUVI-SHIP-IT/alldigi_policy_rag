@@ -235,6 +235,47 @@
   padding: 0;
 }
 
+/* Markdown Tables */
+.table-wrapper {
+  overflow-x: auto;
+  margin: 1rem 0;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.message-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.message-content thead {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.message-content th {
+  padding: 0.65rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.message-content td {
+  padding: 0.6rem 1rem;
+  border-top: 1px solid var(--border-color);
+  vertical-align: top;
+}
+
+.message-content tbody tr:nth-child(even) {
+  background-color: var(--bg-hover);
+}
+
+.message-content tbody tr:hover {
+  background-color: var(--bg-hover);
+  transition: background-color 0.15s;
+}
+
 /* Input Area */
 .input-area {
   padding: 1rem 15%;

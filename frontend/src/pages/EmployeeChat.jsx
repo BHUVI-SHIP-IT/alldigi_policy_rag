@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import useAuthStore from '../store/useAuthStore';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Plus, MessageSquare, LogOut, Send, Bot, User, Trash2, Sun, Moon } from 'lucide-react';
 import useThemeStore from '../store/useThemeStore';
 import logo from '../assets/logo.png';
@@ -273,7 +274,16 @@ const EmployeeChat = () => {
                   {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
                 </div>
                 <div className="message-content">
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      table: ({node, ...props}) => (
+                        <div className="table-wrapper">
+                          <table {...props} />
+                        </div>
+                      )
+                    }}
+                  >{msg.content}</ReactMarkdown>
                 </div>
               </div>
             ))

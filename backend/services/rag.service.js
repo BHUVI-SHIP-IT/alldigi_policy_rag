@@ -1,5 +1,4 @@
 const fs = require('fs');
-const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 const cheerio = require('cheerio');
 const path = require('path');
@@ -34,12 +33,37 @@ const initLLM = async () => {
   }
 };
 
+// Extract text from a PDF buffer using pdfjs-dist (handles malformed XRef tables gracefully)
+const extractPdfText = async (dataBuffer) => {
+  // pdfjs-dist is an ES module — use dynamic import
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const loadingTask = pdfjsLib.getDocument({
+    data: new Uint8Array(dataBuffer),
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+    // Lenient parsing — recover from bad XRef entries instead of throwing
+    stopAtErrors: false,
+  });
+  const pdfDoc = await loadingTask.promise;
+  const numPages = pdfDoc.numPages;
+  const pageTexts = [];
+
+  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    const page = await pdfDoc.getPage(pageNum);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(item => item.str).join(' ');
+    pageTexts.push(pageText);
+  }
+
+  return pageTexts.join('\n\n');
+};
+
 // Text Extraction
 const extractText = async (filePath, mimetype) => {
   if (mimetype === 'application/pdf') {
     const dataBuffer = fs.readFileSync(filePath);
-    const data = await pdfParse(dataBuffer);
-    return data.text;
+    return await extractPdfText(dataBuffer);
   } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
     const result = await mammoth.extractRawText({ path: filePath });
     return result.value;

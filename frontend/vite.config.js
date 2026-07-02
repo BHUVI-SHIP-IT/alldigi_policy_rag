@@ -21,6 +21,17 @@ export default defineConfig({
         changeOrigin: true,
         proxyTimeout: 3600000,  // 1 hour
         timeout: 3600000,       // 1 hour
+        // Required for SSE streaming — prevent the proxy from buffering
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            // Tell the backend not to compress the response (needed for streaming)
+            proxyReq.setHeader('Accept-Encoding', 'identity');
+          });
+          proxy.on('proxyRes', (proxyRes) => {
+            // Disable buffering so SSE chunks pass through immediately
+            proxyRes.headers['x-accel-buffering'] = 'no';
+          });
+        },
       },
     },
   },

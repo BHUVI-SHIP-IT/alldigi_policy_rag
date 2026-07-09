@@ -233,3 +233,159 @@
 .text-center { text-align: center; }
 .text-muted { color: var(--text-secondary); }
 .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+
+/* ── Upload Progress Card ── */
+.upload-progress-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--accent-color);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  transition: border-color 0.3s;
+}
+
+.upload-progress-card.is-done  { border-left-color: #22c55e; }
+.upload-progress-card.is-error { border-left-color: #ef4444; }
+
+.upload-progress-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.upload-progress-icon {
+  display: flex;
+  align-items: center;
+  color: var(--accent-color);
+  flex-shrink: 0;
+}
+.upload-progress-card.is-done  .upload-progress-icon { color: #22c55e; }
+.upload-progress-card.is-error .upload-progress-icon { color: #ef4444; }
+
+.upload-progress-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.upload-phase-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.upload-phase-message {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.upload-chunk-counter {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  background: var(--bg-hover);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.upload-pct {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  min-width: 3rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+.upload-progress-card.is-done  .upload-pct { color: #22c55e; }
+.upload-progress-card.is-error .upload-pct { color: #ef4444; }
+
+/* Progress bar */
+.progress-bar-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-secondary);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-color), #34d399);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.upload-progress-card.is-error .progress-bar-fill { background: #ef4444; }
+
+/* Phase step dots */
+.upload-phases-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.phase-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  text-align: center;
+  gap: 0.3rem;
+}
+
+/* connecting line between dots */
+.phase-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border-color);
+  z-index: 0;
+}
+.phase-step.done:not(:last-child)::after { background: #22c55e; }
+
+.phase-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--border-color);
+  border: 2px solid var(--border-color);
+  z-index: 1;
+  flex-shrink: 0;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.phase-step.active .phase-dot {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(74,179,154,0.2);
+}
+
+.phase-step.done .phase-dot {
+  background: #22c55e;
+  border-color: #22c55e;
+}
+
+.phase-step.active span { color: var(--accent-color); font-weight: 600; }
+.phase-step.done span   { color: #22c55e; }
+
+/* Spinning loader icon */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.spin { animation: spin 1s linear infinite; }
+

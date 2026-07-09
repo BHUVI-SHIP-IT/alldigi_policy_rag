@@ -124,36 +124,65 @@ const generateEmbedding = async (text) => {
   return Array.from(result.data);
 };
 
-const processDocument = async (filePath, mimetype, documentId) => {
+const processDocument = async (filePath, mimetype, documentId, onProgress, filename = '') => {
   try {
+    // Phase: extract text
+    onProgress?.({ phase: 'extracting', pct: 38, message: 'Extracting text from document...' });
     const text = await extractText(filePath, mimetype);
-    // Semantic Overlapping Chunking
+
+    // Phase: chunk text
+    onProgress?.({ phase: 'chunking', pct: 42, message: 'Splitting into semantic chunks...' });
     const chunks = chunkText(text);
 
+    // Build a document header (first 300 chars of text) — usually contains the person's
+    // name / document title. Prepending this to every chunk before embedding ensures
+    // the person's identity is baked into every vector, preventing cross-doc confusion.
+    const docHeader = text.substring(0, 300).replace(/\s+/g, ' ').trim();
+    const docLabel  = filename ? `[Document: ${filename}]` : '';
+
     // Pre-load the embedding model before processing chunks
-    // (avoids all chunks racing to load it simultaneously)
+    onProgress?.({ phase: 'embedding', pct: 45, message: 'Loading embedding model...', chunk: 0, total: chunks.length });
     await generateEmbedding('warmup');
 
-    // Process chunks sequentially to keep the event loop free for other requests
+    // Process chunks sequentially and emit progress per chunk
     const points = [];
     for (let index = 0; index < chunks.length; index++) {
       const chunk = chunks[index];
-      const vector = await generateEmbedding(chunk);
+
+      // Contextual enrichment: prepend document header so the embedding knows
+      // which person/document this chunk belongs to.
+      const enrichedChunk = `${docLabel}\n[Context: ${docHeader}]\n\n${chunk}`;
+      const vector = await generateEmbedding(enrichedChunk);
+
       points.push({
         id: documentId * 1000 + index,
         vector: { "text-dense": vector },
-        payload: { documentId, text: chunk, chunkIndex: index }
+        // Store original chunk text (not enriched) for display in context
+        payload: { documentId, text: chunk, chunkIndex: index, source_doc: filename }
       });
-      if ((index + 1) % 50 === 0) {
-        console.log(`  Embedded ${index + 1}/${chunks.length} chunks for document ${documentId}`);
-      }
+
+      // Emit every chunk so the frontend bar moves smoothly (45% → 85%)
+      const embPct = 45 + Math.floor(((index + 1) / chunks.length) * 40);
+      onProgress?.({
+        phase: 'embedding',
+        pct: embPct,
+        message: `Generating embeddings...`,
+        chunk: index + 1,
+        total: chunks.length,
+      });
     }
 
-    // Batch upsert to stay under Qdrant's 32MB payload limit
+    // Batch upsert to Qdrant
     const BATCH_SIZE = 50;
     for (let i = 0; i < points.length; i += BATCH_SIZE) {
       const batch = points.slice(i, i + BATCH_SIZE);
       await qdrantClient.upsert(COLLECTION_NAME, { wait: true, points: batch });
+      const idxPct = 86 + Math.floor(((i + BATCH_SIZE) / points.length) * 13);
+      onProgress?.({
+        phase: 'indexing',
+        pct: Math.min(idxPct, 99),
+        message: `Indexing to vector database... (batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(points.length / BATCH_SIZE)})`,
+      });
       console.log(`  Indexed batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(points.length / BATCH_SIZE)} for document ${documentId}`);
     }
 
@@ -193,10 +222,18 @@ const queryPolicy = async (question, searchQuery, history, onChunk) => {
 
   const searchResult = await qdrantClient.search(COLLECTION_NAME, {
     vector: { name: 'text-dense', vector: queryVector },
-    limit: 5, // Increased to 5 because chunks are now smaller (200 words)
+    limit: 8,
+    // Reject chunks with very low similarity — prevents wrong-person matches
+    score_threshold: 0.25,
   });
 
-  const contextText = searchResult.map(r => r.payload.text).join('\n\n---\n\n');
+  // Build context, labelling each chunk with its source document for the LLM
+  const contextText = searchResult
+    .map(r => {
+      const src = r.payload.source_doc ? `[Source: ${r.payload.source_doc}]\n` : '';
+      return `${src}${r.payload.text}`;
+    })
+    .join('\n\n---\n\n');
 
   if (contextText.trim().length === 0) {
     return "I cannot find the answer in the provided company policies.";

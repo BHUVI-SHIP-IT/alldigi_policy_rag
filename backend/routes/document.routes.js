@@ -42,43 +42,55 @@ const upload = multer({
 });
 
 router.post('/upload', upload.single('document'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  // Switch to SSE so we can stream progress back in real time
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+  res.flushHeaders();
+
+  const emit = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+  const file = req.file;
+  const objectName = file.filename;
+
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    const file = req.file;
-    const objectName = file.filename;
-
-    // 1. Upload to MinIO
+    // Phase 1 — save to MinIO
+    emit({ phase: 'uploading', pct: 5, message: 'Saving file to storage...' });
     await uploadFile(objectName, file.path);
+    emit({ phase: 'uploading', pct: 25, message: 'File saved to storage.' });
 
-    // 2. Save metadata to Postgres
+    // Phase 2 — record in Postgres
+    emit({ phase: 'uploading', pct: 30, message: 'Recording document metadata...' });
     const result = await db.query(
       'INSERT INTO documents (filename, object_name, status) VALUES ($1, $2, $3) RETURNING *',
-      [file.originalname, objectName, 'uploaded']
+      [file.originalname, objectName, 'processing']
     );
-
     const documentId = result.rows[0].id;
+    emit({ phase: 'saved', pct: 35, message: 'Metadata recorded.', documentId });
 
-    // 3. Clean up local temp file - wait, we need it for extraction!
-    // Instead of deleting it here, we process it, then delete it.
-    res.json({ message: 'File uploaded successfully. Processing started.', document: result.rows[0] });
-
-    // Trigger async embedding extraction job
+    // Phase 3 — process (extract → embed → index) with progress callback
     const { processDocument } = require('../services/rag.service');
-    processDocument(file.path, file.mimetype, documentId).then(async () => {
-       await db.query('UPDATE documents SET status = $1 WHERE id = $2', ['processed', documentId]);
-       fs.unlinkSync(file.path);
-    }).catch(async (err) => {
-       console.error(err);
-       await db.query('UPDATE documents SET status = $1 WHERE id = $2', ['error', documentId]);
-       if(fs.existsSync(file.path)) fs.unlinkSync(file.path);
-    });
+    await processDocument(file.path, file.mimetype, documentId, (progress) => {
+      emit(progress);
+    }, file.originalname);
 
+    // Phase 4 — finalise
+    await db.query('UPDATE documents SET status = $1 WHERE id = $2', ['processed', documentId]);
+    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+
+    emit({ phase: 'done', pct: 100, message: 'Document indexed and ready!', documentId });
+    res.end();
   } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ error: 'Failed to upload document' });
+    console.error('Upload/processing error:', error);
+    emit({ phase: 'error', pct: 0, message: error.message || 'Processing failed.' });
+    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+    res.end();
   }
 });
 
